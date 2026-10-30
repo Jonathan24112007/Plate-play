@@ -1,0 +1,204 @@
+// PlatePlay v1.0 — Prisma Schema
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum KitchenStatus {
+  ACTIVE
+  COMING_SOON
+  CLOSED
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+  PAST
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum OperatingMode {
+  DEMO
+  PILOT
+  LIVE
+}
+
+enum UnleashFeasibility {
+  PENDING
+  FEASIBLE
+  REQUIRES_MODIFICATION
+  REJECTED
+}
+
+// ─── Models ─────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String          @id @default(cuid())
+  name                 String
+  email                String          @unique
+  passwordHash         String
+  phone                String?
+  role                 UserRole        @default(CUSTOMER)
+  emailVerified        Boolean         @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  preferences          Json?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  bookings       BookingRequest[]
+  savedCreations SavedCreation[]
+}
+
+model SavedCreation {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dishName     String
+  kitchenId    String
+  dishId       String
+  base         String
+  sauce        String
+  cheeseOrMain String
+  toppings     String[] @default([])
+  dietaryTags  String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Kitchen {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  description String?
+  status      KitchenStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  slots    KitchenSlot[]
+  bookings BookingRequest[]
+}
+
+model ExperiencePackage {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  name                String
+  pricePerPersonPaise Int      // stored in paise (₹599 = 59900)
+  durationMinutes     String
+  description         String?
+  active              Boolean  @default(true)
+  version             Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  bookings BookingRequest[]
+}
+
+model KitchenSlot {
+  id             String     @id @default(cuid())
+  kitchenId      String
+  kitchen        Kitchen    @relation(fields: [kitchenId], references: [id])
+  date           DateTime   @db.Date  // date only (UTC)
+  startTime      String     // "HH:MM" in Asia/Kolkata
+  endTime        String     // "HH:MM" in Asia/Kolkata
+  status         SlotStatus @default(AVAILABLE)
+  capacity       Int        @default(4)
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  bookings BookingRequest[]
+
+  @@unique([kitchenId, date, startTime])
+}
+
+model BookingRequest {
+  id                  String             @id @default(cuid())
+  publicReference     String             @unique // PP-BK-XXXXXX
+  kitchenId           String
+  kitchen             Kitchen            @relation(fields: [kitchenId], references: [id])
+  packageId           String
+  package             ExperiencePackage  @relation(fields: [packageId], references: [id])
+  slotId              String?
+  slot                KitchenSlot?       @relation(fields: [slotId], references: [id])
+  userId              String?
+  user                User?              @relation(fields: [userId], references: [id])
+  groupSize           Int                @default(4)
+  customerName        String
+  customerEmail       String
+  customerPhone       String?
+  occasion            String?
+  dietaryRequirements String[]           @default([])
+  dietaryNotes        String?
+  customDishDetails   String?
+  estimatedPricePaise Int                // total estimate in paise
+  status              BookingStatus      @default(PENDING)
+  paymentStatus       PaymentStatus      @default(UNPAID)
+  paymentDetails      Json?
+  unleashFeasibility  UnleashFeasibility @default(PENDING)
+  unleashReviewNotes  String?
+  operationalNotes    Json?
+  adminNotes          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  statusHistory BookingStatusHistory[]
+}
+
+model BookingStatusHistory {
+  id             String   @id @default(cuid())
+  bookingId      String
+  booking        BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  previousStatus String?
+  newStatus      String
+  changedAt      DateTime @default(now())
+  changedBy      String   @default("system") // "system", "admin", "customer"
+  notes          String?
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  timestamp  DateTime @default(now())
+}
+
+model SiteConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
