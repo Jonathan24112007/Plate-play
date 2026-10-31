@@ -35,7 +35,7 @@ export default withAuth(
     pages: {
       signIn: "/login",
     },
-    secret: process.env.NEXTAUTH_SECRET || "plateplay-secret-pilot-beta-key-2026",
+    secret: process.env.NEXTAUTH_SECRET,
   }
 );
 
