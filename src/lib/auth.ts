@@ -111,7 +111,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
     error: "/login",
   },
-  secret: process.env.NEXTAUTH_SECRET || "plateplay-secret-pilot-beta-key-2026",
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
 /**
